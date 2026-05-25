@@ -51,6 +51,7 @@ body.electron .color-custom-wrap, body.electron a, body.electron select, body.el
   animation: cardIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
   flex-shrink: 0;
   will-change: transform;
+  touch-action: none;
   
   --accent: rgba(110, 0, 210, 0.9);
   --accent-soft: rgba(130, 0, 255, 0.18);

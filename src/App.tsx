@@ -636,7 +636,7 @@ export default function App() {
     if (!isDraggable(target)) return;
 
     try {
-      target.setPointerCapture(e.pointerId);
+      cardRef.current?.setPointerCapture(e.pointerId);
     } catch (_) {}
 
     dragPointerRef.current.startX = e.clientX;
@@ -661,7 +661,7 @@ export default function App() {
     if (activeTimer && !dragPointerRef.current.dragging) {
       const dx = Math.abs(e.clientX - dragPointerRef.current.startX);
       const dy = Math.abs(e.clientY - dragPointerRef.current.startY);
-      if (dx > 5 || dy > 5) {
+      if (dx > 15 || dy > 15) {
         clearTimeout(activeTimer);
         dragPointerRef.current.timer = null;
       }
@@ -693,9 +693,8 @@ export default function App() {
       }, 50);
     }
 
-    const target = e.target as HTMLElement;
     try {
-      target.releasePointerCapture(e.pointerId);
+      cardRef.current?.releasePointerCapture(e.pointerId);
     } catch (_) {}
   };
 
@@ -1220,6 +1219,7 @@ export default function App() {
         onPointerMove={handleCardPointerMove}
         onPointerUp={handleCardPointerUp}
         onPointerCancel={handleCardPointerUp}
+        onDragStart={(e) => e.preventDefault()}
         style={{
           transform: `translate(${translate.x}px, ${translate.y}px) scale(${isGripped ? scale * 1.035 : scale})`,
           boxShadow: isGripped ? `0 18px 50px 5px ${modes[currentMode]?.soft || 'var(--accent-soft)'}, 0 6px 18px rgba(0, 0, 0, 0.45)` : undefined,
