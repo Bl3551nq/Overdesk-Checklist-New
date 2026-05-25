@@ -635,67 +635,83 @@ export default function App() {
     const target = e.target as HTMLElement;
     if (!isDraggable(target)) return;
 
-    try {
-      cardRef.current?.setPointerCapture(e.pointerId);
-    } catch (_) {}
-
-    dragPointerRef.current.startX = e.clientX;
-    dragPointerRef.current.startY = e.clientY;
-    dragPointerRef.current.startTX = translate.x;
-    dragPointerRef.current.startTY = translate.y;
-    dragPointerRef.current.dragging = false;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startTX = translate.x;
+    const startTY = translate.y;
 
     if (dragPointerRef.current.timer) {
       clearTimeout(dragPointerRef.current.timer);
     }
 
+    let isDraggingActive = false;
+
+    const onPointerMove = (moveEv: PointerEvent) => {
+      const dx = moveEv.clientX - startX;
+      const dy = moveEv.clientY - startY;
+
+      if (!isDraggingActive) {
+        // If they move too much before the long press completes, cancel the timer
+        if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+          if (dragPointerRef.current.timer) {
+            clearTimeout(dragPointerRef.current.timer);
+            dragPointerRef.current.timer = null;
+          }
+          cleanup();
+        }
+        return;
+      }
+
+      setTranslate({
+        x: startTX + dx,
+        y: startTY + dy,
+      });
+    };
+
+    const onPointerUp = () => {
+      if (dragPointerRef.current.timer) {
+        clearTimeout(dragPointerRef.current.timer);
+        dragPointerRef.current.timer = null;
+      }
+
+      if (isDraggingActive) {
+        isDraggingActive = false;
+        setIsGripped(false);
+        dragPointerRef.current.dragging = false;
+        justDraggedRef.current = true;
+        setTimeout(() => {
+          justDraggedRef.current = false;
+        }, 80);
+      }
+
+      cleanup();
+    };
+
+    const cleanup = () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
+    };
+
+    // 250ms long press trigger
     dragPointerRef.current.timer = setTimeout(() => {
+      isDraggingActive = true;
       setIsGripped(true);
       dragPointerRef.current.dragging = true;
       playSoundChime('check');
     }, 250);
+
+    window.addEventListener('pointermove', onPointerMove, { passive: true });
+    window.addEventListener('pointerup', onPointerUp, { passive: true });
+    window.addEventListener('pointercancel', onPointerUp, { passive: true });
   };
 
-  const handleCardPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    const activeTimer = dragPointerRef.current.timer;
-    if (activeTimer && !dragPointerRef.current.dragging) {
-      const dx = Math.abs(e.clientX - dragPointerRef.current.startX);
-      const dy = Math.abs(e.clientY - dragPointerRef.current.startY);
-      if (dx > 15 || dy > 15) {
-        clearTimeout(activeTimer);
-        dragPointerRef.current.timer = null;
-      }
-    }
-
-    if (!dragPointerRef.current.dragging) return;
-
-    const dx = e.clientX - dragPointerRef.current.startX;
-    const dy = e.clientY - dragPointerRef.current.startY;
-
-    setTranslate({
-      x: dragPointerRef.current.startTX + dx,
-      y: dragPointerRef.current.startTY + dy,
-    });
+  const handleCardPointerMove = () => {
+    // Handled globally at window level for complete robustness
   };
 
-  const handleCardPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (dragPointerRef.current.timer) {
-      clearTimeout(dragPointerRef.current.timer);
-      dragPointerRef.current.timer = null;
-    }
-
-    if (dragPointerRef.current.dragging) {
-      dragPointerRef.current.dragging = false;
-      setIsGripped(false);
-      justDraggedRef.current = true;
-      setTimeout(() => {
-        justDraggedRef.current = false;
-      }, 50);
-    }
-
-    try {
-      cardRef.current?.releasePointerCapture(e.pointerId);
-    } catch (_) {}
+  const handleCardPointerUp = () => {
+    // Handled globally at window level for complete robustness
   };
 
   // ── Audio Tone Synthesizer Chimes ──

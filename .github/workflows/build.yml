@@ -36,7 +36,7 @@ jobs:
         run: npx electron-builder --win --publish always
 
       - name: Upload Installer Artifact
-        uses: actions/artifacts/upload@v4
+        uses: actions/upload-artifact@v4
         with:
           name: Overdesk-Checklist-exe
           path: |
