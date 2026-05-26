@@ -12,6 +12,7 @@ declare global {
       scaleStart: () => void;
       scaleEnd: (scale: number) => void;
       installUpdate: () => void;
+      setIgnoreMouseEvents: (ignore: boolean, options?: { forward: boolean }) => void;
       onUpdateAvailable: (cb: (version: string) => void) => void;
       onUpdateDownloaded: (cb: () => void) => void;
     };
@@ -602,6 +603,7 @@ export default function App() {
   const cardRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const listInputRef = useRef<HTMLInputElement>(null);
+  const isIgnoringRef = useRef<boolean>(false);
 
   const isDraggable = (target: HTMLElement): boolean => {
     let curr: HTMLElement | null = target;
@@ -947,6 +949,34 @@ export default function App() {
       if (resizeTimer) clearTimeout(resizeTimer);
     };
   }, [scale]);
+
+  // Dynamic hit-testing: ignore mouse events on transparent background areas so clicks pass through to underneath apps
+  useEffect(() => {
+    if (!window.electronAPI) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target) return;
+
+      const isOverInteractive = !!target.closest('.card') || !!target.closest('.license-screen');
+      const shouldIgnore = !isOverInteractive;
+
+      if (shouldIgnore !== isIgnoringRef.current) {
+        isIgnoringRef.current = shouldIgnore;
+        window.electronAPI?.setIgnoreMouseEvents(shouldIgnore, { forward: true });
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    
+    // Initial sync
+    window.electronAPI.setIgnoreMouseEvents(true, { forward: true });
+    isIgnoringRef.current = true;
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+    };
+  }, [licenseActive]);
 
   // ── Custom Sizing drag logic ──
   const sizingRef = useRef({ dragging: false, startX: 0, startScale: 1.0 });

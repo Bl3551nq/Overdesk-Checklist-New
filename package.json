@@ -17,6 +17,7 @@
     "appId": "com.overdesk.checklist",
     "productName": "Overdesk Checklist",
     "icon": "electron/icon.png",
+    "npmRebuild": false,
     "win": {
       "target": [
         "nsis"

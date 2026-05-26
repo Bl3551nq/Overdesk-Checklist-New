@@ -244,6 +244,13 @@ ipcMain.on('close-app', () => {
   app.quit();
 });
 
+// Toggle Mouse click-through status dynamically
+ipcMain.on('set-ignore-mouse-events', (event, ignore, options) => {
+  if (mainWindow) {
+    mainWindow.setIgnoreMouseEvents(ignore, options);
+  }
+});
+
 // Set Height dynamically (e.g. on minimizing)
 ipcMain.on('set-height', (event, height) => {
   if (mainWindow) {

@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   scaleEnd: (scale) => ipcRenderer.send('scale-end', scale),
   saveIcon: (dataUrl) => ipcRenderer.send('save-icon', dataUrl),
   installUpdate: () => ipcRenderer.send('install-update'),
+  setIgnoreMouseEvents: (ignore, options) => ipcRenderer.send('set-ignore-mouse-events', ignore, options),
   onUpdateAvailable: (cb) => {
     ipcRenderer.on('update-available', (event, version) => cb(version));
   },
