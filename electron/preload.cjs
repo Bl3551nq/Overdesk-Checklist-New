@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   cardBounds: (bounds) => ipcRenderer.send('card-bounds', bounds),
   scaleStart: () => ipcRenderer.send('scale-start'),
   scaleEnd: (scale) => ipcRenderer.send('scale-end', scale),
+  saveIcon: (dataUrl) => ipcRenderer.send('save-icon', dataUrl),
   installUpdate: () => ipcRenderer.send('install-update'),
   onUpdateAvailable: (cb) => {
     ipcRenderer.on('update-available', (event, version) => cb(version));

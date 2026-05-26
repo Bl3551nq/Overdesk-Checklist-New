@@ -1,10 +1,11 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { autoUpdater } = require('electron-updater');
 
-// Keep variable in higher scope to prevent garbage collection
+// Keep variables in higher scope to prevent garbage collection
 let mainWindow = null;
+let tray = null;
 const configPath = path.join(app.getPath('userData'), 'app-config.json');
 
 // Helper to read config
@@ -30,13 +31,14 @@ function writeConfig(data) {
 }
 
 function createWindow() {
-  const savedScale = readConfig().scale || 1.0;
+  const config = readConfig();
+  const savedScale = config.scale || 1.0;
   
   // Custom sizing math fitting our card size (320px width initially)
   const initialWidth = Math.round(330 * savedScale);
   const initialHeight = Math.round(530 * savedScale);
 
-  mainWindow = new BrowserWindow({
+  const windowOptions = {
     width: initialWidth,
     height: initialHeight,
     frame: false,
@@ -50,7 +52,24 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true
     }
-  });
+  };
+
+  // Restore saved coordinates if loaded correctly
+  if (typeof config.x === 'number' && typeof config.y === 'number') {
+    windowOptions.x = config.x;
+    windowOptions.y = config.y;
+  }
+
+  // Load appropriate application icon
+  const customIconPath = path.join(app.getPath('userData'), 'icon.png');
+  const packagedIconPath = path.join(__dirname, 'icon.png');
+  if (fs.existsSync(customIconPath)) {
+    windowOptions.icon = customIconPath;
+  } else if (fs.existsSync(packagedIconPath)) {
+    windowOptions.icon = packagedIconPath;
+  }
+
+  mainWindow = new BrowserWindow(windowOptions);
 
   // Load from local static build or development server
   const isDev = !app.isPackaged;
@@ -62,6 +81,18 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
 
+  // Save coordinates when window moves
+  let moveTimeout;
+  mainWindow.on('move', () => {
+    if (moveTimeout) clearTimeout(moveTimeout);
+    moveTimeout = setTimeout(() => {
+      if (mainWindow) {
+        const [x, y] = mainWindow.getPosition();
+        writeConfig({ x, y });
+      }
+    }, 300);
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -72,6 +103,66 @@ function createWindow() {
       autoUpdater.checkForUpdatesAndNotify().catch(err => {
         console.error('Error checking for updates:', err);
       });
+    }
+  });
+}
+
+function createTray() {
+  const customIconPath = path.join(app.getPath('userData'), 'icon.png');
+  const packagedIconPath = path.join(__dirname, 'icon.png');
+  let iconPath = packagedIconPath;
+
+  if (fs.existsSync(customIconPath)) {
+    iconPath = customIconPath;
+  }
+
+  let trayIcon;
+  if (fs.existsSync(iconPath)) {
+    // Resize down to standard 16x16 system tray image size
+    trayIcon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 });
+  } else {
+    trayIcon = nativeImage.createEmpty();
+  }
+
+  tray = new Tray(trayIcon);
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: 'Show/Hide App',
+      click: () => {
+        if (mainWindow) {
+          if (mainWindow.isVisible()) {
+            mainWindow.hide();
+          } else {
+            mainWindow.show();
+            mainWindow.focus();
+          }
+        } else {
+          createWindow();
+        }
+      }
+    },
+    { type: 'separator' },
+    {
+      label: 'Quit',
+      click: () => {
+        app.quit();
+      }
+    }
+  ]);
+
+  tray.setToolTip('Overdesk Checklist');
+  tray.setContextMenu(contextMenu);
+
+  tray.on('click', () => {
+    if (mainWindow) {
+      if (mainWindow.isVisible()) {
+        mainWindow.hide();
+      } else {
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    } else {
+      createWindow();
     }
   });
 }
@@ -91,6 +182,7 @@ autoUpdater.on('update-downloaded', () => {
 
 app.whenReady().then(() => {
   createWindow();
+  createTray();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -195,6 +287,28 @@ ipcMain.on('scale-start', () => {
 
 ipcMain.on('scale-end', (event, scale) => {
   writeConfig({ scale });
+});
+
+ipcMain.on('save-icon', (event, dataUrl) => {
+  try {
+    const base64Data = dataUrl.replace(/^data:image\/png;base64,/, "");
+    const customIconPath = path.join(app.getPath('userData'), 'icon.png');
+    fs.writeFileSync(customIconPath, base64Data, 'base64');
+    
+    // Dynamically update main window icon
+    if (mainWindow) {
+      const nativeImg = nativeImage.createFromPath(customIconPath);
+      mainWindow.setIcon(nativeImg);
+    }
+    
+    // Dynamically update tray icon
+    if (tray) {
+      const trayImg = nativeImage.createFromPath(customIconPath).resize({ width: 16, height: 16 });
+      tray.setImage(trayImg);
+    }
+  } catch (err) {
+    console.error('Error saving dynamic icon:', err);
+  }
 });
 
 ipcMain.on('install-update', () => {

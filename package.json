@@ -6,7 +6,7 @@
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
-    "build": "vite build",
+    "build": "node electron/init-build.cjs && vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
@@ -16,11 +16,12 @@
   "build": {
     "appId": "com.overdesk.checklist",
     "productName": "Overdesk Checklist",
+    "icon": "electron/icon.png",
     "win": {
       "target": [
-        "portable",
         "nsis"
       ],
+      "icon": "electron/icon.png",
       "requestedExecutionLevel": "asInvoker"
     },
     "publish": {

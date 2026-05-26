@@ -567,6 +567,9 @@ export default function App() {
 
   // Card Draggability (pointer-based with long press) State
   const [translate, setTranslate] = useState<{ x: number; y: number }>(() => {
+    if (typeof window !== 'undefined' && (window as any).electronAPI) {
+      return { x: 0, y: 0 };
+    }
     try {
       const saved = localStorage.getItem('fm_translate');
       if (saved) {
@@ -631,6 +634,7 @@ export default function App() {
   };
 
   const handleCardPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (window.electronAPI) return; // Native -webkit-app-region: drag handles physical layout movement in Electron
     if (e.button !== 0) return;
     const target = e.target as HTMLElement;
     if (!isDraggable(target)) return;
@@ -829,11 +833,82 @@ export default function App() {
     };
   }, [editMode]);
 
-  // Handle reporting dynamic visual bounding box to Electron to prevent clipping
-  const reportBounds = () => {
-    if (window.electronAPI && cardRef.current) {
-      // Small timeout to allow element size animations to complete
-      setTimeout(() => {
+  // Dynamic custom high-resolution system-tray & window icon canvas render pipeline
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window as any).electronAPI) {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 256;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.clearRect(0, 0, 256, 256);
+
+          ctx.save();
+          // Diagonal rotation angle matching Saturn orbital design in UI
+          ctx.translate(128, 128);
+          ctx.rotate(-12 * Math.PI / 180);
+          ctx.translate(-128, -128);
+
+          // 1. Draw back of the ring
+          ctx.strokeStyle = '#0e0e11';
+          ctx.lineWidth = 26;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.ellipse(128, 128, 110, 40, 0, Math.PI, 0, true);
+          ctx.stroke();
+
+          // 2. Draw Sphere
+          const grad = ctx.createRadialGradient(98, 98, 10, 128, 128, 76);
+          grad.addColorStop(0, '#56efff');
+          grad.addColorStop(0.35, '#00b4d8');
+          grad.addColorStop(0.7, '#0077b6');
+          grad.addColorStop(1, '#003e5c');
+
+          ctx.fillStyle = grad;
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+          ctx.shadowBlur = 15;
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 10;
+          ctx.beginPath();
+          ctx.arc(128, 128, 76, 0, Math.PI * 2);
+          ctx.fill();
+          
+          ctx.restore(); // cancel shadow mappings
+
+          // 3. Draw front of the ring (using a clip path to clip to bottom half)
+          ctx.save();
+          ctx.translate(128, 128);
+          ctx.rotate(-12 * Math.PI / 180);
+          ctx.translate(-128, -128);
+
+          ctx.strokeStyle = '#0e0e11';
+          ctx.lineWidth = 26;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.ellipse(128, 128, 110, 40, 0, 0, Math.PI, false);
+          ctx.stroke();
+
+          ctx.restore();
+
+          const dataUrl = canvas.toDataURL('image/png');
+          (window as any).electronAPI.saveIcon(dataUrl);
+        }
+      } catch (err) {
+        console.error('Error auto-generating and saving dynamic logo:', err);
+      }
+    }
+  }, []);
+
+  // Handle reporting dynamic visual bounding box to Electron to prevent clipping with ResizeObserver
+  useEffect(() => {
+    if (!window.electronAPI || !cardRef.current) return;
+
+    let resizeTimer: any = null;
+    const observer = new ResizeObserver(() => {
+      if (resizeTimer) clearTimeout(resizeTimer);
+      // Fast, ultra-smooth boundary synchronization
+      resizeTimer = setTimeout(() => {
         if (cardRef.current) {
           const rect = cardRef.current.getBoundingClientRect();
           window.electronAPI?.cardBounds({
@@ -843,13 +918,27 @@ export default function App() {
             h: cardRef.current.offsetHeight,
           });
         }
-      }, 100);
-    }
-  };
+      }, 16); // ~1 frame debounce
+    });
 
-  useEffect(() => {
-    reportBounds();
-  }, [currentMode, minimized, editMode, scale, modes]);
+    observer.observe(cardRef.current);
+    
+    // Immediate measurement for swift loading bounds alignment
+    if (cardRef.current) {
+      const rect = cardRef.current.getBoundingClientRect();
+      window.electronAPI?.cardBounds({
+        x: rect.left,
+        y: rect.top,
+        w: 320,
+        h: cardRef.current.offsetHeight,
+      });
+    }
+
+    return () => {
+      observer.disconnect();
+      if (resizeTimer) clearTimeout(resizeTimer);
+    };
+  }, [scale]);
 
   // ── Custom Sizing drag logic ──
   const sizingRef = useRef({ dragging: false, startX: 0, startScale: 1.0 });
@@ -1184,10 +1273,41 @@ export default function App() {
       {/* Gumroad License validation screen */}
       {!licenseActive && (
         <div className="license-screen" id="license-screen">
-          <svg className="license-logo" viewBox="0 0 100 100">
-            <circle cx="50" cy="50" r="45" fill="rgba(110,0,210,0.3)" stroke="rgba(150,80,255,0.5)" strokeWidth="2" />
-            <circle cx="50" cy="50" r="22" fill="rgba(255,46,52,0.85)" />
-            <circle cx="50" cy="50" r="10" fill="rgba(255,120,120,0.9)" />
+          <svg className="license-logo" viewBox="0 0 100 100" style={{ width: '90px', height: '90px', transform: 'rotate(-12deg)', overflow: 'visible', marginBottom: '16px' }}>
+            <defs>
+              <radialGradient id="sphereGrad" cx="30%" cy="30%" r="70%">
+                <stop offset="0%" stopColor="#4df3ff" />
+                <stop offset="50%" stopColor="#00b0ff" />
+                <stop offset="100%" stopColor="#0a6080" />
+              </radialGradient>
+              <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="50%">
+                <stop offset="0%" stopColor="#2c2c35" />
+                <stop offset="50%" stopColor="#15151b" />
+                <stop offset="100%" stopColor="#070709" />
+              </linearGradient>
+              <clipPath id="frontClip">
+                <rect x="0" y="45" width="100" height="55" />
+              </clipPath>
+            </defs>
+            {/* Back of the orbit ring */}
+            <path 
+              d="M 10 50 C 10 32, 90 32, 90 50" 
+              fill="none" 
+              stroke="url(#ringGrad)" 
+              strokeWidth="11" 
+              strokeLinecap="round"
+            />
+            {/* Glossy Planet Sphere */}
+            <circle cx="50" cy="50" r="30" fill="url(#sphereGrad)" filter="drop-shadow(0px 8px 12px rgba(0,0,0,0.455))" />
+            {/* Front of the orbit ring */}
+            <path 
+              d="M 10 50 C 10 68, 90 68, 90 50" 
+              fill="none" 
+              stroke="url(#ringGrad)" 
+              strokeWidth="11" 
+              strokeLinecap="round"
+              clipPath="url(#frontClip)"
+            />
           </svg>
           <div className="license-title">Overdesk Checklist</div>
           <div className="license-sub">
