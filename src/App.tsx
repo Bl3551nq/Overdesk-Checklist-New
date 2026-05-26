@@ -845,6 +845,12 @@ export default function App() {
           ctx.clearRect(0, 0, 256, 256);
 
           ctx.save();
+          // Scale down around the center to add proper safety margin padding to match standard taskbar icons perfectly
+          ctx.translate(128, 128);
+          ctx.scale(0.76, 0.76);
+          ctx.translate(-128, -128);
+
+          ctx.save();
           // Diagonal rotation angle matching Saturn orbital design in UI
           ctx.translate(128, 128);
           ctx.rotate(-12 * Math.PI / 180);
@@ -890,6 +896,8 @@ export default function App() {
           ctx.stroke();
 
           ctx.restore();
+
+          ctx.restore(); // restore global scale transformation
 
           const dataUrl = canvas.toDataURL('image/png');
           (window as any).electronAPI.saveIcon(dataUrl);
@@ -1331,16 +1339,9 @@ export default function App() {
             Activate
           </button>
           
-          {/* Helpful documentation to help them verify immediately */}
-          <div className="license-hint" style={{ fontSize: '11px', marginTop: '6px' }}>
-            <span style={{ color: 'rgba(255,255,255,0.4)' }}>Need a test key? Feel free to use 32-characters:</span>
-            <br />
-            <code style={{ background: 'rgba(255,255,255,0.1)', padding: '2px 5px', borderRadius: '4px', color: '#fff', fontSize: '10px', display: 'inline-block', marginTop: '4px' }}>
-              OVERDESKTESTLICENSEKEY32CHARACTE
-            </code>
-            <br />
-            <span style={{ color: 'rgba(255,255,255,0.4)', marginTop: '4px', display: 'block' }}>
-              Get key from Gumroad: <a href="https://overdesk.gumroad.com/l/app3" target="_blank" rel="noreferrer" style={{ color: 'rgba(150,80,255,1)', textDecoration: 'underline' }}>overdesk.gumroad.com/l/app3</a>
+          <div className="license-hint" style={{ fontSize: '11px', marginTop: '12px' }}>
+            <span style={{ color: 'rgba(255,255,255,0.4)' }}>
+              Get your license key on Gumroad: <a href="https://overdesk.gumroad.com/l/app3" target="_blank" rel="noreferrer" style={{ color: '#00ccff', textDecoration: 'underline' }}>overdesk.gumroad.com/l/app3</a>
             </span>
           </div>
         </div>

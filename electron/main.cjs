@@ -44,7 +44,8 @@ function createWindow() {
     frame: false,
     transparent: true,
     hasShadow: false,
-    resizable: false, // Handle scaling via card scale logic
+    resizable: true, // Set to true to bypass OS/Win32 boundary positioning restrictions
+    maximizable: false, // Prevent maximize behavior to sustain checklist aspect ratio
     alwaysOnTop: true,
     skipTaskbar: false,
     webPreferences: {
@@ -213,17 +214,6 @@ ipcMain.handle('check-license', () => {
 // Gumroad License verify
 ipcMain.handle('validate-license', async (event, rawKey) => {
   const licenseKey = rawKey.trim();
-  
-  // Custom dev/tester bypass helper
-  // Allows keys starting with 'OVERDESK' or containing 'TEST' or of appropriate length
-  const isTestKey = licenseKey.toUpperCase().includes('TEST') || 
-                    licenseKey.toUpperCase().startsWith('OVERDESK') ||
-                    licenseKey.replace(/-/g, '').length === 32;
-
-  if (isTestKey) {
-    writeConfig({ licenseValid: true, licenseKey });
-    return { ok: true, test: true };
-  }
 
   try {
     // Gumroad API call
