@@ -10,9 +10,13 @@ on:
 
 jobs:
   build:
-    runs-on: windows-2022        # ← FIXED: explicit x64 runner
+    runs-on: windows-2022
     permissions:
       contents: write
+    env:
+      npm_config_arch: x64          # ← Force x64 arch for ALL npm steps
+      npm_config_platform: win32
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -23,11 +27,31 @@ jobs:
           node-version: 20
           cache: 'npm'
 
-      - name: Install System Dependencies
+      - name: Install Dependencies
         shell: bash
         run: |
           rm -f package-lock.json
-          npm install --arch=x64   # ← FIXED: force x64 native binaries
+          npm install
+
+      - name: Fix app-builder binary (force x64)
+        shell: pwsh
+        run: |
+          $pkgJson = Get-Content "node_modules\app-builder-bin\package.json" | ConvertFrom-Json
+          $version = $pkgJson.version
+          $exePath = "node_modules\app-builder-bin\win\x64\app-builder.exe"
+          
+          Write-Host "app-builder-bin version: $version"
+          Write-Host "Downloading correct x64 binary..."
+          
+          Invoke-WebRequest `
+            -Uri "https://github.com/develar/app-builder/releases/download/v$version/app-builder_windows_amd64.7z" `
+            -OutFile "app-builder.7z"
+          
+          # Extract using 7zip (available on GitHub runners)
+          7z e app-builder.7z -o"node_modules\app-builder-bin\win\x64\" -y
+          
+          Write-Host "Binary replaced. Verifying..."
+          & $exePath --version
 
       - name: Build Web Application (React/Vite)
         run: npm run build
@@ -35,7 +59,7 @@ jobs:
       - name: Build Windows Executables (Electron Builder)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx electron-builder --win --x64 --publish always   # ← FIXED: explicit arch
+        run: npx electron-builder --win --x64 --publish always
 
       - name: Upload Installer Artifact
         uses: actions/upload-artifact@v4
