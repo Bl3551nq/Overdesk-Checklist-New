@@ -24,11 +24,12 @@ jobs:
           node-version: 20
           cache: 'npm'
 
+      - name: Enable Developer Mode (For Symlinks & Execution)
+        run: reg add "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" /t REG_DWORD /v "AllowDevelopmentWithoutDevLicense" /d 1 /f
+        shell: cmd
+
       - name: Install System Dependencies
-        shell: bash
-        run: |
-          rm -f package-lock.json
-          npm install --arch=x64   # ← FIXED: force x64 native binaries
+        run: npm ci
 
       - name: Build Web Application (React/Vite)
         run: npm run build
@@ -36,7 +37,7 @@ jobs:
       - name: Build Windows Executables (Electron Builder)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx electron-builder --win --x64 --publish always   # ← FIXED: explicit arch
+        run: npx electron-builder --win --x64 --publish always
 
       - name: Upload Installer Artifact
         uses: actions/upload-artifact@v4

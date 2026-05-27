@@ -268,8 +268,8 @@ ipcMain.on('card-bounds', (event, bounds) => {
     const config = readConfig();
     const scale = config.scale || 1.0;
     // Resize Electron window to hug the card tightly, preserving transparency elsewhere
-    const targetW = Math.round((bounds.w + 20) * scale);
-    const targetH = Math.round((bounds.h + 20) * scale);
+    const targetW = Math.round((bounds.w + 4) * scale);
+    const targetH = Math.round((bounds.h + 4) * scale);
     
     // Safety minimums
     const currentW = Math.max(100, targetW);
